@@ -1,0 +1,101 @@
+name: Native tabs release
+
+on:
+  push:
+    tags: ['native-tabs-v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing native-tabs-v tag to build and release
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-tabs-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'higorhgon/AeroSpace'
+    runs-on: macos-26
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Validate release tag
+        id: version
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^native-tabs-v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]; then
+            echo "Expected a tag such as native-tabs-v0.21.3-native-tabs.1" >&2
+            exit 1
+          fi
+          printf 'tag=%s\nversion=%s\n' "$RELEASE_TAG" "${RELEASE_TAG#native-tabs-v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: refs/tags/${{ steps.version.outputs.tag }}
+          persist-credentials: false
+
+      - name: Set up Xcode and Swift
+        run: |
+          ./.github/gh-actions-runner-xcode-select.sh
+          brew install bash fish
+          HOMEBREW_DISABLE_LOAD_FORMULA=1 brew update
+          brew install swiftly
+          swiftly init --skip-install --assume-yes
+          swiftly install
+
+      - name: Build universal app and CLI
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          ./build-release.sh --build-version "$RELEASE_VERSION" --codesign-identity -
+          cd .release
+          zip="AeroSpace-v$RELEASE_VERSION.zip"
+          shasum -a 256 "$zip" > "$zip.sha256"
+
+      - name: Show build logs on failure
+        if: failure()
+        run: |
+          for log in .release/build-app.log .release/build-cli.log; do
+            if [[ -f "$log" ]]; then cat "$log"; fi
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: aerospace-universal
+          path: |
+            .release/AeroSpace-v*.zip
+            .release/AeroSpace-v*.zip.sha256
+          if-no-files-found: error
+          include-hidden-files: true
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: aerospace-universal
+          path: release
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        working-directory: release
+        run: |
+          zip="AeroSpace-v$RELEASE_VERSION.zip"
+          sha256sum --check "$zip.sha256"
+          gh release create "$RELEASE_TAG" "$zip" "$zip.sha256" \
+            --verify-tag --prerelease --title "AeroSpace $RELEASE_VERSION" \
+            --notes "Universal macOS build (Intel and Apple Silicon) of the native-tabs fork. Includes AeroSpace.app and the aerospace CLI. Ad-hoc signed and not notarized."
