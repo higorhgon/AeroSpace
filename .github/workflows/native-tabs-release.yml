@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing native-tabs-v tag to build and release
+        description: Release tag (created from the selected branch if missing)
         required: true
         type: string
       runner:
@@ -33,6 +33,7 @@ jobs:
     outputs:
       tag: ${{ steps.version.outputs.tag }}
       version: ${{ steps.version.outputs.version }}
+      commit: ${{ steps.source.outputs.commit }}
     steps:
       - name: Validate release tag
         id: version
@@ -45,8 +46,23 @@ jobs:
 
       - uses: actions/checkout@v7.0.1
         with:
-          ref: refs/tags/${{ steps.version.outputs.tag }}
+          ref: ${{ github.sha }}
           persist-credentials: false
+
+      - name: Verify release source
+        id: source
+        run: |
+          commit="$(git rev-parse HEAD)"
+          tag_ref="refs/tags/$RELEASE_TAG"
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            tag_commit="$(git ls-remote origin "$tag_ref" "$tag_ref^{}" |
+              awk -v ref="$tag_ref" '$2 == ref { tag = $1 } $2 == ref "^{}" { peeled = $1 } END { print peeled ? peeled : tag }')"
+            if [[ -n "$tag_commit" && "$tag_commit" != "$commit" ]]; then
+              echo "Tag $RELEASE_TAG points to $tag_commit, not the selected commit $commit." >&2
+              exit 1
+            fi
+          fi
+          printf 'commit=%s\n' "$commit" >> "$GITHUB_OUTPUT"
 
       - name: Set up Xcode and Swift
         run: |
@@ -103,11 +119,26 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.build.outputs.tag }}
           RELEASE_VERSION: ${{ needs.build.outputs.version }}
+          BUILD_COMMIT: ${{ needs.build.outputs.commit }}
         working-directory: release
         run: |
           zip="AeroSpace-v$RELEASE_VERSION.zip"
           dmg="AeroSpace-v$RELEASE_VERSION.dmg"
           sha256sum --check "$zip.sha256" "$dmg.sha256"
+          tag_ref="refs/tags/$RELEASE_TAG"
+          tag_commit() {
+            git ls-remote "https://github.com/$GH_REPO.git" "$tag_ref" "$tag_ref^{}" |
+              awk -v ref="$tag_ref" '$2 == ref { tag = $1 } $2 == ref "^{}" { peeled = $1 } END { print peeled ? peeled : tag }'
+          }
+          existing_commit="$(tag_commit)"
+          if [[ -z "$existing_commit" && "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            gh api "repos/$GH_REPO/git/refs" --method POST -f "ref=$tag_ref" -f "sha=$BUILD_COMMIT" --silent
+            existing_commit="$BUILD_COMMIT"
+          fi
+          if [[ "$existing_commit" != "$BUILD_COMMIT" ]]; then
+            echo "Tag $RELEASE_TAG does not identify the commit that was built." >&2
+            exit 1
+          fi
           gh release create "$RELEASE_TAG" "$dmg" "$dmg.sha256" "$zip" "$zip.sha256" \
             --verify-tag --prerelease --title "AeroSpace $RELEASE_VERSION" \
             --notes "Universal macOS build (Intel and Apple Silicon) of the native-tabs fork. The DMG supports drag-and-drop installation, and the ZIP remains available for package managers. Both include AeroSpace.app and the aerospace CLI. The binaries are ad-hoc signed and not notarized."
