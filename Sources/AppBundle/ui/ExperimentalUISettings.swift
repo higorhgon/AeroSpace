@@ -1,6 +1,12 @@
 import SwiftUI
 
 struct ExperimentalUISettings {
+    @MainActor
+    var squareAppKitWindowCorners: Bool {
+        get { AppKitWindowCorners.isEnabled }
+        set { AppKitWindowCorners.isEnabled = newValue }
+    }
+
     var displayStyle: MenuBarStyle {
         get {
             switch UserDefaults.standard.string(forKey: ExperimentalUISettingsItems.displayStyle.rawValue) {
@@ -44,6 +50,15 @@ func getExperimentalUISettingsMenu(viewModel: TrayMenuModel) -> some View {
         Text("Menu bar style (macOS 14 or later):")
         ForEach(MenuBarStyle.allCases, id: \.id) { style in
             MenuBarStyleButton(style: style, color: color).environmentObject(viewModel)
+        }
+        if #available(macOS 26, *) {
+            Divider()
+            Button {
+                viewModel.experimentalUISettings.squareAppKitWindowCorners.toggle()
+            } label: {
+                Toggle("Square AppKit window corners", isOn: .constant(viewModel.experimentalUISettings.squareAppKitWindowCorners))
+            }
+            Text("Applies to supported apps after restarting them.")
         }
     } label: {
         Text("Experimental UI Settings (No stability guarantees)")
