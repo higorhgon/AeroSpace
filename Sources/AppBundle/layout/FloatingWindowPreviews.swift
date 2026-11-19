@@ -15,6 +15,7 @@ final class FloatingWindowPreviews {
 
     private var targets: [CGWindowID: Target] = [:]
     private var previews: [CGWindowID: FloatingPreview] = [:]
+    private var previewOrigins: [OpaqueWindowId: CGPoint] = [:]
     private var startTask: Task<Void, Never>?
     private var requestedPermission = false
     private var captureStoppedByUser = false
@@ -26,21 +27,26 @@ final class FloatingWindowPreviews {
         sync()
     }
 
-    func containsPreview(at point: Point) -> Bool {
-        targets.contains { id, target in
-            previews[id]?.isVisible == true && target.frame.contains(point.asCGPoint)
+    func blocksHover(at point: Point) -> Bool {
+        let location = point.withYAxisFlipped.asCGPoint
+        return targets.contains { id, target in
+            if let preview = previews[id], preview.isVisible {
+                return preview.frame.contains(location)
+            }
+            return startTask != nil && !failedTargets.contains(id) && panelFrame(for: target).contains(location)
         }
     }
 
     func sync() {
         if !config.floatingWindowPreviews { captureStoppedByUser = false }
-        targets = captureStoppedByUser ? [:] : findCoveredWindows()
+        previewOrigins = previewOrigins.filter { id, _ in Window.get(byId: id)?.isFloating == true }
+        targets = captureStoppedByUser ? [:] : findPreviewTargets()
         failedTargets.formIntersection(targets.keys)
         for id in Array(previews.keys) where targets[id] == nil {
             previews.removeValue(forKey: id)?.stop()
         }
         for (id, target) in targets {
-            previews[id]?.setFrame(cocoaFrame(target.frame))
+            previews[id]?.setFrame(panelFrame(for: target))
         }
         guard startTask == nil, targets.keys.contains(where: { previews[$0] == nil && !failedTargets.contains($0) }) else { return }
         guard CGPreflightScreenCaptureAccess() else {
@@ -53,7 +59,7 @@ final class FloatingWindowPreviews {
         startTask = Task { await startMissingPreviews() }
     }
 
-    private func findCoveredWindows() -> [CGWindowID: Target] {
+    private func findPreviewTargets() -> [CGWindowID: Target] {
         guard config.floatingWindowPreviews,
               sessionIsActive,
               !serverArgs.isReadOnly,
@@ -65,29 +71,24 @@ final class FloatingWindowPreviews {
         guard let onScreen = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
                 as? [[String: Any]] else { return [:] }
 
-        // WindowServer returns the list front to back. Track only tiles from this
-        // workspace, so a preview is created only when one actually covers a float.
-        var tileFrames: [CGRect] = []
-        var covered: [CGWindowID: Target] = [:]
+        // Native focus can reorder windows after the hover session completes.
+        // Use AeroSpace's focus to decide when to switch to previews.
+        var result: [CGWindowID: Target] = [:]
         for info in onScreen {
             guard let id = info[kCGWindowNumber as String] as? CGWindowID,
                   let pid = info[kCGWindowOwnerPID as String] as? pid_t,
                   let window = Window.get(byNativeId: id, pid: pid),
                   window.nodeWorkspace === workspace,
+                  window.isFloating,
+                  !window.isFullscreen,
                   window.lifeStatus == .alive,
+                  (info[kCGWindowLayer as String] as? CGWindowLevel) == CGWindowLevelForKey(.normalWindow),
                   let bounds = info[kCGWindowBounds as String] as? [String: Any],
                   let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary),
                   !frame.isEmpty else { continue }
-            if window.parent is TilingContainer {
-                tileFrames.append(frame)
-            } else if window.isFloating,
-                      (info[kCGWindowLayer as String] as? CGWindowLevel) == CGWindowLevelForKey(.normalWindow),
-                      tileFrames.contains(where: { $0.intersects(frame) })
-            {
-                covered[id] = Target(windowId: window.windowId, pid: pid, frame: frame)
-            }
+            result[id] = Target(windowId: window.windowId, pid: pid, frame: frame)
         }
-        return covered
+        return result
     }
 
     private func startMissingPreviews() async {
@@ -105,8 +106,9 @@ final class FloatingWindowPreviews {
                   !failedTargets.contains(id), previews[id] == nil else { continue }
             let preview = FloatingPreview(
                 source: source,
-                frame: cocoaFrame(target.frame),
+                frame: panelFrame(for: target),
                 onClick: { [weak self] in self?.focusOriginal(id) },
+                onMove: { [weak self] origin in self?.previewOrigins[target.windowId] = origin },
                 onStop: { [weak self] error in self?.captureDidStop(id, error: error) },
             )
             previews[id] = preview
@@ -143,8 +145,17 @@ final class FloatingWindowPreviews {
         }
     }
 
-    private func cocoaFrame(_ frame: CGRect) -> CGRect {
-        CGRect(x: frame.minX, y: mainMonitorInfo.height - frame.maxY, width: frame.width, height: frame.height)
+    private func panelFrame(for target: Target) -> CGRect {
+        let original = CGRect(
+            x: target.frame.minX,
+            y: mainMonitorInfo.height - target.frame.maxY,
+            width: target.frame.width,
+            height: target.frame.height,
+        )
+        guard let origin = previewOrigins[target.windowId] else { return original }
+        let screen = NSScreen.screens.first { $0.frame.contains(CGPoint(x: original.midX, y: original.midY)) }
+        let position = screen.map { clampPreviewOrigin(origin, size: original.size, to: $0.visibleFrame) } ?? original.origin
+        return CGRect(origin: position, size: original.size)
     }
 }
 
@@ -161,15 +172,17 @@ private final class FloatingPreview {
     private var stopped = false
 
     var isVisible: Bool { panel.isVisible }
+    var frame: CGRect { panel.frame }
 
     init(
         source: SCWindow,
         frame: CGRect,
         onClick: @escaping () -> Void,
+        onMove: @escaping (CGPoint) -> Void,
         onStop: @escaping @MainActor (Error) -> Void,
     ) {
         self.onStop = onStop
-        view = FloatingPreviewView(frame: CGRect(origin: .zero, size: frame.size), onClick: onClick)
+        view = FloatingPreviewView(frame: CGRect(origin: .zero, size: frame.size), onClick: onClick, onMove: onMove)
         view.wantsLayer = true
         view.layer?.contentsGravity = .resize
         panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -217,7 +230,7 @@ private final class FloatingPreview {
     }
 
     func setFrame(_ frame: CGRect) {
-        if panel.frame != frame {
+        if !view.isDragging, panel.frame != frame {
             panel.setFrame(frame, display: false)
         }
     }
@@ -234,20 +247,54 @@ private final class FloatingPreview {
 
 private final class FloatingPreviewView: NSView {
     private let onClick: () -> Void
+    private let onMove: (CGPoint) -> Void
+    private var dragStart: (mouse: CGPoint, origin: CGPoint, display: CGRect?)?
+    private(set) var isDragging = false
 
-    init(frame: CGRect, onClick: @escaping () -> Void) {
+    init(frame: CGRect, onClick: @escaping () -> Void, onMove: @escaping (CGPoint) -> Void) {
         self.onClick = onClick
+        self.onMove = onMove
         super.init(frame: frame)
     }
 
     required init?(coder: NSCoder) { nil }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-    override func mouseDown(with event: NSEvent) {}
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        dragStart = (window.convertPoint(toScreen: event.locationInWindow), window.frame.origin, window.screen?.visibleFrame)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let dragStart, let window else { return }
+        let mouse = window.convertPoint(toScreen: event.locationInWindow)
+        let dx = mouse.x - dragStart.mouse.x
+        let dy = mouse.y - dragStart.mouse.y
+        guard isDragging || hypot(dx, dy) >= 5 else { return }
+        isDragging = true
+        let origin = CGPoint(x: dragStart.origin.x + dx, y: dragStart.origin.y + dy)
+        let position = dragStart.display.map { clampPreviewOrigin(origin, size: window.frame.size, to: $0) } ?? origin
+        window.setFrameOrigin(position)
+    }
+
     override func mouseUp(with event: NSEvent) {
-        if bounds.contains(convert(event.locationInWindow, from: nil)) {
+        defer {
+            dragStart = nil
+            isDragging = false
+        }
+        if isDragging, let window {
+            onMove(window.frame.origin)
+        } else if bounds.contains(convert(event.locationInWindow, from: nil)) {
             onClick()
         }
     }
+}
+
+private func clampPreviewOrigin(_ origin: CGPoint, size: CGSize, to bounds: CGRect) -> CGPoint {
+    CGPoint(
+        x: min(max(origin.x, bounds.minX), max(bounds.minX, bounds.maxX - size.width)),
+        y: min(max(origin.y, bounds.minY), max(bounds.minY, bounds.maxY - size.height)),
+    )
 }
 
 private final class FloatingPreviewFrames: NSObject, SCStreamOutput, SCStreamDelegate {

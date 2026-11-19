@@ -6,6 +6,11 @@ struct MoveMouseCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache = false
 
     func run(_ env: CmdEnv, _ io: CmdIo) async -> BinaryExitCode {
+        // Hover already places the pointer where the user wants it. Warping it
+        // can interrupt a move from the mosaic toward a floating preview.
+        if config.floatingWindowPreviews, refreshSessionEvent?.isFocusFollowsMouse == true {
+            return args.failIfNoop ? .fail : .succ
+        }
         let mouse = mouseLocation
         guard let target = args.resolveTargetOrReportError(env, io) else { return .fail }
         switch args.mouseTarget.val {

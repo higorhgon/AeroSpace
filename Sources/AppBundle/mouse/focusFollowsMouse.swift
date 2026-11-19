@@ -23,7 +23,7 @@ import Common
         let location = event.locationInWindow.asMyPoint.withYAxisFlipped
         focusFollowsTask?.cancel()
         guard let token: RunSessionGuard = .isServerEnabled,
-              !FloatingWindowPreviews.shared.containsPreview(at: location) else { return }
+              !FloatingWindowPreviews.shared.blocksHover(at: location) else { return }
         focusFollowsTask = Task.startUnstructured { @MainActor in
             try checkCancellation()
             // Ignores macOS menubar dropdown, but, unfortunately, it doesn't ignore non-native menu-like fake windows.
@@ -46,6 +46,7 @@ import Common
             }
             if let window {
                 try await runLightSession(.focusFollowsMouse, token) {
+                    guard !FloatingWindowPreviews.shared.blocksHover(at: location) else { return }
                     let focus = globalFocus
                     if config.focusFollowsMouse.keepFloatingFocused,
                        focus.workspace === workspace,
