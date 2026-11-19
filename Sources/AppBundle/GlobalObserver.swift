@@ -46,12 +46,6 @@ enum GlobalObserver {
     @MainActor
     static func initObserver() {
         let nc = NSWorkspace.shared.notificationCenter
-        nc.addObserver(forName: NSWorkspace.sessionDidResignActiveNotification, object: nil, queue: .main) { _ in
-            Task { @MainActor in FloatingWindowPreviews.shared.setSessionActive(false) }
-        }
-        nc.addObserver(forName: NSWorkspace.sessionDidBecomeActiveNotification, object: nil, queue: .main) { _ in
-            Task { @MainActor in FloatingWindowPreviews.shared.setSessionActive(true) }
-        }
         nc.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main, using: onNotif)
         nc.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main, using: onNotif)
         nc.addObserver(forName: NSWorkspace.didHideApplicationNotification, object: nil, queue: .main, using: onHideApp)

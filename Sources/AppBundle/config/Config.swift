@@ -50,7 +50,6 @@ struct Config: Withable {
     var execOnWorkspaceChange: [String] = [] // todo deprecate
     var keyMapping = KeyMapping()
     var execConfig: ExecConfig = ExecConfig()
-    var floatingWindowPreviews: Bool = false
     var focusFollowsMouse: FocusFollowsMouse = FocusFollowsMouse()
 
     var onFocusChanged: Shell<any Command> = .empty

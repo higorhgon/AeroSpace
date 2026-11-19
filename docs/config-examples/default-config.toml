@@ -61,10 +61,6 @@ persistent-workspaces = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B",
 # See: https://nikitabobko.github.io/AeroSpace/commands#mode
 on-mode-changed = ""
 
-# Show floating windows as live previews whenever a tile is focused in the same workspace.
-# Drag a preview to move it, or click it to focus the original. Requires Screen Recording permission.
-floating-window-previews = false
-
 focus-follows-mouse.enabled = false
 # Keep a focused floating window active when hovering over tiles in the same workspace.
 # Clicking a tile still focuses it.
