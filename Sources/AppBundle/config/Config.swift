@@ -39,9 +39,8 @@ struct Config: Withable {
     var _indentForNestedContainersWithTheSameOrientation: Void = ()
     var enableNormalizationFlattenContainers: Bool = true
     var _nonEmptyWorkspacesRootContainersLayoutOnStartup: Void = ()
-    var defaultRootContainerLayout: Layout = .tiles
+    var defaultRootContainerLayout: DefaultRootContainerLayout = .tiles
     var defaultRootContainerOrientation: DefaultContainerOrientation = .auto
-    var enableAlternatingWindowSplits: Bool = false
     var startAtLogin: Bool = false
     var autoReloadConfig: Bool = false
     var automaticallyUnhideMacosHiddenApps: Bool = false
@@ -77,6 +76,17 @@ enum ConfigVersion: Int, Comparable, CaseIterable, Sendable, CustomStringConvert
     static func < (lhs: ConfigVersion, rhs: ConfigVersion) -> Bool { lhs.rawValue < rhs.rawValue }
 
     var description: String { rawValue.description }
+}
+
+enum DefaultRootContainerLayout: String {
+    case tiles, accordion, bsp
+
+    var containerLayout: Layout {
+        switch self {
+            case .tiles, .bsp: .tiles
+            case .accordion: .accordion
+        }
+    }
 }
 
 enum DefaultContainerOrientation: String {

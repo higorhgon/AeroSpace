@@ -10,7 +10,7 @@ extension Workspace {
                     case .vertical: .v
                     case .auto: workspaceMonitorInfo.then { $0.width >= $0.height } ? .h : .v
                 }
-                return TilingContainer(parent: self, adaptiveWeight: 1, orientation, config.defaultRootContainerLayout, index: INDEX_BIND_LAST)
+                return TilingContainer(parent: self, adaptiveWeight: 1, orientation, config.defaultRootContainerLayout.containerLayout, index: INDEX_BIND_LAST)
             case 1:
                 return containers.singleOrNil().orDie()
             default:
@@ -66,7 +66,7 @@ extension Workspace {
     }
 
     @MainActor
-    func bindingForAlternatingSplit() -> BindingData {
+    func bindingForBspSplit() -> BindingData {
         let root = rootTilingContainer
         var previous = lastInsertedTilingWindow
         if previous?.nodeWorkspace !== self || !(previous?.parent is TilingContainer) || previous?.lifeStatus != .alive {
@@ -81,7 +81,6 @@ extension Workspace {
         }
         if parent === root && root.inhabitedChildren.count == 1 {
             root.layout = .tiles
-            root.changeOrientation(.h)
             return BindingData(parent: root, adaptiveWeight: WEIGHT_AUTO, index: index + 1)
         }
 

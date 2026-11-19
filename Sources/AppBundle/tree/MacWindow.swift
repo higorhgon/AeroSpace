@@ -38,8 +38,8 @@ final class MacWindow: Window {
         // atomic synchronous section
         if let existing = allWindowsMap[windowId] { return existing }
         let tilingWorkspace = (data.parent as? TilingContainer)?.nodeWorkspace
-        if config.enableAlternatingWindowSplits, let tilingWorkspace {
-            data = tilingWorkspace.bindingForAlternatingSplit()
+        if config.defaultRootContainerLayout == .bsp, let tilingWorkspace {
+            data = tilingWorkspace.bindingForBspSplit()
         }
         let window = MacWindow(windowId, macApp, lastFloatingSize: rect?.size, parent: data.parent, adaptiveWeight: data.adaptiveWeight, index: data.index)
         allWindowsMap[windowId] = window

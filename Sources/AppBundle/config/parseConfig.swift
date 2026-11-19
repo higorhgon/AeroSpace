@@ -139,9 +139,8 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "enable-normalization-flatten-containers": Parser(\.enableNormalizationFlattenContainers, parseBool),
     "enable-normalization-opposite-orientation-for-nested-containers": Parser(\.enableNormalizationOppositeOrientationForNestedContainers, parseBool),
 
-    "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),
+    "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseDefaultRootContainerLayout),
     "default-root-container-orientation": Parser(\.defaultRootContainerOrientation, parseDefaultContainerOrientation),
-    "enable-alternating-window-splits": Parser(\.enableAlternatingWindowSplits, parseBool),
 
     "start-at-login": Parser(\.startAtLogin, parseBool),
     "auto-reload-config": Parser(\.autoReloadConfig, parseBool),
@@ -387,9 +386,14 @@ private func parseStartupRootContainerLayout(_ raw: OrderedJson, _ backtrace: Co
         .map { _ in () }
 }
 
-private func parseLayout(_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<Layout> {
-    parseString(raw, backtrace)
-        .flatMap { $0.parseLayout().toResult(.init(backtrace, "Can't parse layout '\($0)'")) }
+private func parseDefaultRootContainerLayout(
+    _ raw: OrderedJson,
+    _ backtrace: ConfigBacktrace,
+) -> ResOrConfigParseDiagnostic<DefaultRootContainerLayout> {
+    parseString(raw, backtrace).flatMap { value in
+        if value == "list" { return .success(.tiles) }
+        return DefaultRootContainerLayout(rawValue: value).toResult(.init(backtrace, "Can't parse layout '\(value)'"))
+    }
 }
 
 private func skipParsing<T: Sendable>(_ value: T) -> @Sendable (_ raw: OrderedJson, _ backtrace: ConfigBacktrace) -> ResOrConfigParseDiagnostic<T> {

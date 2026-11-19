@@ -26,17 +26,15 @@ enable-normalization-opposite-orientation-for-nested-containers = true
 # You can set 0 to disable the padding feature
 accordion-padding = 30
 
-# Possible values: tiles|accordion
+# Possible values: tiles|accordion|bsp
+# With 'bsp', each new tiled window splits the previous tiled window.
+# The root orientation sets the first split. Subsequent splits alternate axes.
 default-root-container-layout = 'tiles'
 
 # Possible values: horizontal|vertical|auto
 # 'auto' means: wide monitor (anything wider than high) gets horizontal orientation,
 #               tall monitor (anything higher than wide) gets vertical orientation
 default-root-container-orientation = 'auto'
-
-# Split the previous tiled window when a new tiled window opens.
-# The first split is left/right, then nested splits alternate top/bottom and left/right.
-enable-alternating-window-splits = false
 
 # Mouse follows focus when focused monitor changes
 # Drop it from your config, if you don't like this behavior
