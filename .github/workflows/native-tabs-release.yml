@@ -9,6 +9,13 @@ on:
         description: Existing native-tabs-v tag to build and release
         required: true
         type: string
+      runner:
+        description: Hosted macOS runner for the universal build
+        default: macos-26-intel
+        type: choice
+        options:
+          - macos-26-intel
+          - macos-26
 
 permissions:
   contents: read
@@ -20,7 +27,7 @@ concurrency:
 jobs:
   build:
     if: github.repository == 'higorhgon/AeroSpace'
-    runs-on: macos-26
+    runs-on: ${{ inputs.runner || 'macos-26-intel' }}
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     outputs:
