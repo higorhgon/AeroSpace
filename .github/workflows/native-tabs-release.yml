@@ -64,7 +64,9 @@ jobs:
           ./build-release.sh --build-version "$RELEASE_VERSION" --codesign-identity -
           cd .release
           zip="AeroSpace-v$RELEASE_VERSION.zip"
+          dmg="AeroSpace-v$RELEASE_VERSION.dmg"
           shasum -a 256 "$zip" > "$zip.sha256"
+          shasum -a 256 "$dmg" > "$dmg.sha256"
 
       - name: Show build logs on failure
         if: failure()
@@ -79,6 +81,8 @@ jobs:
           path: |
             .release/AeroSpace-v*.zip
             .release/AeroSpace-v*.zip.sha256
+            .release/AeroSpace-v*.dmg
+            .release/AeroSpace-v*.dmg.sha256
           if-no-files-found: error
           include-hidden-files: true
 
@@ -102,7 +106,8 @@ jobs:
         working-directory: release
         run: |
           zip="AeroSpace-v$RELEASE_VERSION.zip"
-          sha256sum --check "$zip.sha256"
-          gh release create "$RELEASE_TAG" "$zip" "$zip.sha256" \
+          dmg="AeroSpace-v$RELEASE_VERSION.dmg"
+          sha256sum --check "$zip.sha256" "$dmg.sha256"
+          gh release create "$RELEASE_TAG" "$dmg" "$dmg.sha256" "$zip" "$zip.sha256" \
             --verify-tag --prerelease --title "AeroSpace $RELEASE_VERSION" \
-            --notes "Universal macOS build (Intel and Apple Silicon) of the native-tabs fork. Includes AeroSpace.app and the aerospace CLI. Ad-hoc signed and not notarized."
+            --notes "Universal macOS build (Intel and Apple Silicon) of the native-tabs fork. The DMG supports drag-and-drop installation, and the ZIP remains available for package managers. Both include AeroSpace.app and the aerospace CLI. The binaries are ad-hoc signed and not notarized."

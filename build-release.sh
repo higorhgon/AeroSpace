@@ -75,6 +75,7 @@ cd .release
     cp -r AeroSpace.app "AeroSpace-v$build_version"
     zip -r "AeroSpace-v$build_version.zip" "AeroSpace-v$build_version"
 cd -
+./script/build-release-dmg.sh ".release/AeroSpace-v$build_version"
 
 #################
 ### Brew Cask ###
@@ -90,4 +91,4 @@ done
 ### Done ###
 ############
 echo
-echo "$PWD"/.release/*.zip
+printf '%s\n' "$PWD"/.release/*.zip "$PWD"/.release/*.dmg
