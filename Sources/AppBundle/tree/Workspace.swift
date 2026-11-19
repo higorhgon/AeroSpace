@@ -5,6 +5,7 @@ import Common
 
 final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     let name: String
+    weak var lastInsertedTilingWindow: Window?
     nonisolated private let nameLogicalSegments: StringLogicalSegments
 
     @MainActor private init(_ name: String) {

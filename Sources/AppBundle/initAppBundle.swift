@@ -53,6 +53,7 @@ import Foundation
 
 @MainActor
 private func smartLayoutAtStartup() {
+    guard !config.enableAlternatingWindowSplits else { return }
     let workspace = globalFocus.workspace
     let root = workspace.rootTilingContainer
     switch root.children.count <= 3 {

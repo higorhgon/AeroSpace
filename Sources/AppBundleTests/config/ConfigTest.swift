@@ -30,6 +30,13 @@ struct ConfigTest {
         assertEquals(result.warnings, [])
     }
 
+    @Test func testAlternatingWindowSplitsAreOptIn() {
+        #expect(!parseConfig("").config.enableAlternatingWindowSplits)
+        let result = parseConfig("config-version = 2\nenable-alternating-window-splits = true")
+        #expect(result.errors.isEmpty)
+        #expect(result.config.enableAlternatingWindowSplits)
+    }
+
     @Test func testConfigVersionOutOfBounds() {
         let result = parseConfig(
             """

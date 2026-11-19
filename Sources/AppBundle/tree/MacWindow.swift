@@ -25,7 +25,7 @@ final class MacWindow: Window {
     static func getOrRegister(windowId: OpaqueWindowId, macApp: MacApp) async throws -> MacWindow {
         if let existing = allWindowsMap[windowId] { return existing }
         let rect = try await macApp.getAxRect(windowId, .cancellable)
-        let data = try await unbindAndGetBindingDataForNewWindow(
+        var data = try await unbindAndGetBindingDataForNewWindow(
             windowId,
             macApp,
             isStartup
@@ -37,8 +37,13 @@ final class MacWindow: Window {
 
         // atomic synchronous section
         if let existing = allWindowsMap[windowId] { return existing }
+        let tilingWorkspace = (data.parent as? TilingContainer)?.nodeWorkspace
+        if config.enableAlternatingWindowSplits, let tilingWorkspace {
+            data = tilingWorkspace.bindingForAlternatingSplit()
+        }
         let window = MacWindow(windowId, macApp, lastFloatingSize: rect?.size, parent: data.parent, adaptiveWeight: data.adaptiveWeight, index: data.index)
         allWindowsMap[windowId] = window
+        tilingWorkspace?.lastInsertedTilingWindow = window
 
         try await debugWindowsIfRecording(window, .cancellable)
         if try await !restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window) {
