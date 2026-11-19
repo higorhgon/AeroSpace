@@ -10,12 +10,14 @@ struct WorkspaceTest {
     @Test(arguments: [(DefaultContainerOrientation.horizontal, Orientation.h), (.vertical, .v)])
     func testBspSplitsFollowLastInsertedWindow(defaultOrientation: DefaultContainerOrientation, rootOrientation: Orientation) throws {
         config.defaultRootContainerLayout = .bsp
-        config.defaultRootContainerOrientation = defaultOrientation
+        config.defaultRootContainerOrientation = rootOrientation == .h ? .vertical : .horizontal
         let workspace = Workspace.get(byName: "bsp")
         let root = workspace.rootTilingContainer
         #expect(root.layout == .tiles)
         let first = TestWindow.new(id: 1, parent: root)
         workspace.lastInsertedTilingWindow = first
+        #expect(root.orientation == rootOrientation.opposite)
+        config.defaultRootContainerOrientation = defaultOrientation
 
         let secondBinding = workspace.bindingForBspSplit()
         #expect(secondBinding.parent === root)

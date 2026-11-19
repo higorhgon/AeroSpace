@@ -5,16 +5,25 @@ extension Workspace {
         let containers = children.filterIsInstance(of: TilingContainer.self)
         switch containers.count {
             case 0:
-                let orientation: Orientation = switch config.defaultRootContainerOrientation {
-                    case .horizontal: .h
-                    case .vertical: .v
-                    case .auto: workspaceMonitorInfo.then { $0.width >= $0.height } ? .h : .v
-                }
-                return TilingContainer(parent: self, adaptiveWeight: 1, orientation, config.defaultRootContainerLayout.containerLayout, index: INDEX_BIND_LAST)
+                return TilingContainer(
+                    parent: self,
+                    adaptiveWeight: 1,
+                    defaultRootOrientation,
+                    config.defaultRootContainerLayout.containerLayout,
+                    index: INDEX_BIND_LAST,
+                )
             case 1:
                 return containers.singleOrNil().orDie()
             default:
                 die("Workspace must contain zero or one tiling container as its child")
+        }
+    }
+
+    @MainActor private var defaultRootOrientation: Orientation {
+        switch config.defaultRootContainerOrientation {
+            case .horizontal: .h
+            case .vertical: .v
+            case .auto: workspaceMonitorInfo.then { $0.width >= $0.height } ? .h : .v
         }
     }
 
@@ -81,6 +90,7 @@ extension Workspace {
         }
         if parent === root && root.inhabitedChildren.count == 1 {
             root.layout = .tiles
+            root.changeOrientation(defaultRootOrientation)
             return BindingData(parent: root, adaptiveWeight: WEIGHT_AUTO, index: index + 1)
         }
 
