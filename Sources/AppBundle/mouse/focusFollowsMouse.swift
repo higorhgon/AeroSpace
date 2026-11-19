@@ -22,7 +22,8 @@ import Common
     focusFollowsMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { @MainActor event in
         let location = event.locationInWindow.asMyPoint.withYAxisFlipped
         focusFollowsTask?.cancel()
-        guard let token: RunSessionGuard = .isServerEnabled else { return }
+        guard let token: RunSessionGuard = .isServerEnabled,
+              !FloatingWindowPreviews.shared.containsPreview(at: location) else { return }
         focusFollowsTask = Task.startUnstructured { @MainActor in
             try checkCancellation()
             // Ignores macOS menubar dropdown, but, unfortunately, it doesn't ignore non-native menu-like fake windows.
