@@ -45,6 +45,14 @@ import Common
             }
             if let window {
                 try await runLightSession(.focusFollowsMouse, token) {
+                    let focus = globalFocus
+                    if config.focusFollowsMouse.keepFloatingFocused,
+                       focus.workspace === workspace,
+                       focus.windowOrNil?.isFloating == true,
+                       window.parent is TilingContainer
+                    {
+                        return
+                    }
                     _ = window.focusWindow()
                     window.nativeFocus()
                 }

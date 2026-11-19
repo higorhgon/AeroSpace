@@ -30,6 +30,20 @@ struct ConfigTest {
         assertEquals(result.warnings, [])
     }
 
+    @Test func testKeepFloatingFocusedIsOptIn() {
+        #expect(!parseConfig("").config.focusFollowsMouse.keepFloatingFocused)
+        let result = parseConfig(
+            """
+            config-version = 2
+            focus-follows-mouse.enabled = true
+            focus-follows-mouse.keep-floating-focused = true
+            """,
+        )
+        #expect(result.errors.isEmpty)
+        #expect(result.config.focusFollowsMouse.enabled)
+        #expect(result.config.focusFollowsMouse.keepFloatingFocused)
+    }
+
     @Test func testConfigVersionOutOfBounds() {
         let result = parseConfig(
             """

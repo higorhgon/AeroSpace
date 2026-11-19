@@ -62,6 +62,9 @@ persistent-workspaces = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "A", "B",
 on-mode-changed = ""
 
 focus-follows-mouse.enabled = false
+# Keep a focused floating window active when hovering over tiles in the same workspace.
+# Clicking a tile still focuses it.
+focus-follows-mouse.keep-floating-focused = false
 
 # Possible values: (qwerty|dvorak|colemak)
 # See https://nikitabobko.github.io/AeroSpace/guide#key-mapping
