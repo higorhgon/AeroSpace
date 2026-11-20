@@ -131,7 +131,18 @@ final class MacWindow: Window {
     }
 
     @MainActor override func nativeFocus() {
+        if shouldFocusWithoutRaise && macApp.nativeFocusWithoutRaise(windowId) { return }
         macApp.nativeFocus(windowId)
+    }
+
+    /// With `keep-floating-windows-on-top`, focusing a tile must not cover the floating windows of its workspace
+    @MainActor private var shouldFocusWithoutRaise: Bool {
+        guard config.keepFloatingWindowsOnTop,
+              parent is TilingContainer,
+              let workspace = nodeWorkspace,
+              !workspace.floatingWindows.isEmpty else { return false }
+        // Accordion siblings overlap each other, so the focused one has to be raised
+        return !parents.contains { ($0 as? TilingContainer)?.layout == .accordion }
     }
 
     override func closeAxWindow() {

@@ -66,6 +66,10 @@ focus-follows-mouse.enabled = false
 # Clicking a tile still focuses it.
 focus-follows-mouse.keep-floating-focused = false
 
+# Focus tiled windows without raising them while their workspace has floating windows,
+# so floating windows stay visible on top. Uses a private macOS API (SIP can stay enabled).
+keep-floating-windows-on-top = false
+
 # Possible values: (qwerty|dvorak|colemak)
 # See https://nikitabobko.github.io/AeroSpace/guide#key-mapping
 key-mapping.preset = 'qwerty'

@@ -44,6 +44,13 @@ struct ConfigTest {
         #expect(result.config.focusFollowsMouse.keepFloatingFocused)
     }
 
+    @Test func testKeepFloatingWindowsOnTopIsOptIn() {
+        #expect(!parseConfig("").config.keepFloatingWindowsOnTop)
+        let result = parseConfig("keep-floating-windows-on-top = true")
+        #expect(result.errors.isEmpty)
+        #expect(result.config.keepFloatingWindowsOnTop)
+    }
+
     @Test func testConfigVersionOutOfBounds() {
         let result = parseConfig(
             """

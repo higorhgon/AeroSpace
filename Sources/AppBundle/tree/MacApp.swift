@@ -181,6 +181,17 @@ final class MacApp: AbstractApp {
         }
     }
 
+    /// Focus the window without bringing it to the front. Windows above it (floating windows) stay above.
+    /// - Returns: false if it wasn't possible. The caller should fall back to ``nativeFocus(_:)``
+    @MainActor func nativeFocusWithoutRaise(_ windowId: OpaqueWindowId) -> Bool {
+        if serverArgs.isReadOnly { return true }
+        guard let nativeWindowId = windowIdMapping.forward[windowId] else { return false }
+        let isAppFrontmost = NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
+        let currentlyFocused = isAppFrontmost ? lastFocusedNativeWindowOpaqueId.flatMap { windowIdMapping.forward[$0] } : nil
+        MacApp.focusJob?.cancel()
+        return focusWithoutRaise(pid: pid, nativeWindowId: nativeWindowId, currentlyFocusedNativeWindowId: currentlyFocused)
+    }
+
     func setAxFrame(_ windowId: OpaqueWindowId, _ topLeft: Point?, _ size: CGSize?) {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
         setFrameJobs[windowId] = withWindowAsync(windowId, .cancellable) { [axApp] window, job in
